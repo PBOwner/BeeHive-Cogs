@@ -1,12 +1,9 @@
-import aiohttp #type: ignore
+import aiohttp
 import io
-import os
-import tempfile
-import math
 import asyncio
-import discord #type: ignore
-import matplotlib.pyplot as plt #type: ignore
-from redbot.core import commands #type: ignore
+import discord
+import matplotlib.pyplot as plt
+from redbot.core import commands
 
 class VirusTotal(commands.Cog):
     """VirusTotal file upload and analysis via Discord"""
@@ -15,7 +12,7 @@ class VirusTotal(commands.Cog):
         self.bot = bot
 
     @commands.bot_has_permissions(embed_links=True)
-    @commands.command(name="virustotal", description="Submit a file for analysis via VirusTotal", aliases=["vt"])
+    @commands.command(name="virustotal", description="Submit a file or URL for analysis via VirusTotal", aliases=["vt"])
     async def virustotal(self, ctx, file_url: str = None):
         async with ctx.typing():
             vt_key = await self.bot.get_shared_api_tokens("virustotal")
@@ -41,7 +38,7 @@ class VirusTotal(commands.Cog):
                             permalink = data.get("data", {}).get("id")
                             if permalink:
                                 await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{permalink}")
-                                await self.check_results(ctx, permalink, ctx.author.id)
+                                await self.check_results(ctx, permalink, ctx.author.id, "url")
                             else:
                                 raise ValueError("No permalink found in the response.")
                     elif attachments:
@@ -56,17 +53,17 @@ class VirusTotal(commands.Cog):
                                 data = await response.json()
                                 analysis_id = data.get("data", {}).get("id")
                                 if analysis_id:
-                                    await self.check_results(ctx, analysis_id, ctx.author.id)
+                                    await self.check_results(ctx, analysis_id, ctx.author.id, "file")
                                     # Delete the attachment message from the channel
                                     await ctx.message.delete()
                                 else:
                                     raise ValueError("No analysis ID found in the response.")
                     else:
-                        embed = discord.Embed(title='Error: No file provided', description="The bot was unable to find content to submit for analysis!\nPlease provide one of the following when using this command:\n- URL file can be downloaded from\n- Drag-and-drop a file less than 25mb in size\n- Reply to a message containing a file", colour=discord.Colour(0xff4545))
+                        embed = discord.Embed(title='Error: No file or URL provided', description="The bot was unable to find content to submit for analysis!\nPlease provide one of the following when using this command:\n- URL to be analyzed\n- Drag-and-drop a file less than 25mb in size\n- Reply to a message containing a file", colour=discord.Colour(0xff4545))
                         embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/close.png")
                         await ctx.send(embed=embed)
                 except (aiohttp.ClientResponseError, ValueError) as e:
-                    embed = discord.Embed(title='Error: Failed to submit file', description=str(e), colour=discord.Colour(0xff4545))
+                    embed = discord.Embed(title='Error: Failed to submit file or URL', description=str(e), colour=discord.Colour(0xff4545))
                     embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/close.png")
                     await ctx.send(embed=embed)
                 except asyncio.TimeoutError:
@@ -74,7 +71,7 @@ class VirusTotal(commands.Cog):
                     embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/close.png")
                     await ctx.send(embed=embed)
 
-    async def check_results(self, ctx, analysis_id, presid):
+    async def check_results(self, ctx, analysis_id, presid, analysis_type):
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
         headers = {"x-apikey": vt_key["api_key"]}
 
@@ -92,7 +89,7 @@ class VirusTotal(commands.Cog):
                                 raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
                             data = await response.json()
                             attributes = data.get("data", {}).get("attributes", {})
-                    
+
                     stats = attributes.get("stats", {})
                     malicious_count = stats.get("malicious", 0)
                     suspicious_count = stats.get("suspicious", 0)
@@ -100,7 +97,7 @@ class VirusTotal(commands.Cog):
                     harmless_count = stats.get("harmless", 0)
                     failure_count = stats.get("failure", 0)
                     unsupported_count = stats.get("type-unsupported", 0)
-                    meta = data.get("meta", {}).get("file_info", {})
+                    meta = data.get("meta", {}).get("file_info", {}) if analysis_type == "file" else {}
                     sha256 = meta.get("sha256")
                     sha1 = meta.get("sha1")
                     md5 = meta.get("md5")
@@ -109,7 +106,7 @@ class VirusTotal(commands.Cog):
                     noanswer_count = failure_count + unsupported_count
                     safe_count = harmless_count + undetected_count
                     percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
-                    if sha256 and sha1 and md5:
+                    if sha256 and sha1 and md5 or analysis_type == "url":
                         embed = discord.Embed()
                         content = f"||<@{presid}>||"
                         labels = ['Malicious', 'Suspicious', 'No Verdict', 'Harmless', 'Failed', 'Unsupported']
@@ -170,12 +167,16 @@ class VirusTotal(commands.Cog):
                             embed.description = "# No security vendors currently flag this file as malicious\nYou should be safe to run and use it. Check back on the results later to see if vendors change their minds - it happens"
                             embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Green/checkmark-circle-outline.png")
 
-                        embed.add_field(name="MD5", value=f"**`{md5}`**", inline=False)
-                        embed.add_field(name="SHA-1", value=f"**`{sha1}`**", inline=False)
-                        embed.add_field(name="SHA-256", value=f"**`{sha256}`**", inline=False)
+                        if analysis_type == "file":
+                            embed.add_field(name="MD5", value=f"**`{md5}`**", inline=False)
+                            embed.add_field(name="SHA-1", value=f"**`{sha1}`**", inline=False)
+                            embed.add_field(name="SHA-256", value=f"**`{sha256}`**", inline=False)
 
                         # Create the button for the virustotal results link
-                        button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/file/{sha256}", emoji="🌐", style=discord.ButtonStyle.url)
+                        if analysis_type == "file":
+                            button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/file/{sha256}", emoji="", style=discord.ButtonStyle.url)
+                        else:
+                            button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/url/{analysis_id}", emoji="", style=discord.ButtonStyle.url)
                         button2 = discord.ui.Button(label="Get a second opinion", url="https://discord.gg/6PbaH6AfvF", style=discord.ButtonStyle.url)
                         view = discord.ui.View()
                         view.add_item(button)
@@ -191,5 +192,3 @@ class VirusTotal(commands.Cog):
                 embed = discord.Embed(title='Request timed out', description="The bot was unable to complete the request due to a timeout.", colour=discord.Colour.red())
                 embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/close-circle-outline.png")
                 await ctx.send(embed=embed)
-
-
