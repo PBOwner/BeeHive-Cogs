@@ -177,7 +177,7 @@ class VirusTotal(commands.Cog):
                             button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/file/{sha256}", style=discord.ButtonStyle.url)
                         else:
                             button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/url/{analysis_id}", style=discord.ButtonStyle.url)
-                        button2 = discord.ui.Button(label="Get a second opinion", url="https://discord.gg/6PbaH6AfvF", style=discord.ButtonStyle.url)
+                        button2 = discord.ui.Button(label="Get a second opinion", url="https://discord.gg/9f7WV6V8ud", style=discord.ButtonStyle.url)
                         view = discord.ui.View()
                         view.add_item(button)
                         view.add_item(button2)
