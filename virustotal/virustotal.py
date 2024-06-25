@@ -174,9 +174,9 @@ class VirusTotal(commands.Cog):
 
                         # Create the button for the virustotal results link
                         if analysis_type == "file":
-                            button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/file/{sha256}", emoji="", style=discord.ButtonStyle.url)
+                            button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/file/{sha256}", style=discord.ButtonStyle.url)
                         else:
-                            button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/url/{analysis_id}", emoji="", style=discord.ButtonStyle.url)
+                            button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/url/{analysis_id}", style=discord.ButtonStyle.url)
                         button2 = discord.ui.Button(label="Get a second opinion", url="https://discord.gg/6PbaH6AfvF", style=discord.ButtonStyle.url)
                         view = discord.ui.View()
                         view.add_item(button)
